@@ -1,3 +1,4 @@
+
 package com.tafe.schedule;
 
 import com.liferay.mail.service.MailServiceUtil;
@@ -8,10 +9,10 @@ import com.liferay.portal.kernel.messaging.Message;
 import com.liferay.portal.kernel.messaging.MessageListener;
 import com.liferay.portal.kernel.messaging.MessageListenerException;
 import com.liferay.portal.kernel.util.StringUtil;
+import com.liferay.portal.kernel.util.Validator;
 import com.liferay.portal.model.Group;
 import com.liferay.portal.model.Role;
 import com.liferay.portal.model.User;
-import com.liferay.portal.model.UserGroupRole;
 import com.liferay.portal.security.auth.PrincipalThreadLocal;
 import com.liferay.portal.security.permission.PermissionChecker;
 import com.liferay.portal.security.permission.PermissionCheckerFactoryUtil;
@@ -48,7 +49,9 @@ import javax.mail.internet.InternetAddress;
 public class Scheduler implements MessageListener {
 
 	@Override
-	public void receive(Message arg0) throws MessageListenerException {
+	public void receive(Message arg0)
+		throws MessageListenerException {
+
 		try {
 			Long parentFolderId = DLFolderConstants.DEFAULT_PARENT_FOLDER_ID;
 			Long companyId = PortalUtil.getDefaultCompanyId();
@@ -61,8 +64,9 @@ public class Scheduler implements MessageListener {
 			PermissionChecker permissionChecker = PermissionCheckerFactoryUtil.create(adminUsers.get(0), true);
 			PermissionThreadLocal.setPermissionChecker(permissionChecker);
 
-			//TODO: Change this to TAFE site name.
+			// TODO: Change this to TAFE site name.
 			Group group = GroupLocalServiceUtil.getGroup(companyId, "Guest");
+			Long groupId = group.getGroupId();
 
 			/*
 			 * List<Folder> lFolder =
@@ -72,34 +76,38 @@ public class Scheduler implements MessageListener {
 			 * parentFolderId);
 			 */
 
-			List<DLFolder> dlFolders = DLFolderLocalServiceUtil.getDLFolders(0, DLFolderLocalServiceUtil.getDLFoldersCount() - 1);
-			List<DLFileEntry> fileEntryService = null;
-
-			// DLFolder defaultFolder = DLFolderLocalServiceUtil.getFolder(group.getGroupId(), parentFolderId, "Home");
-			List<DLFileEntry> fileEntryService1 = DLFileEntryLocalServiceUtil.getFileEntries(group.getGroupId(), parentFolderId, -1, -1,
-					null);
-			for (DLFileEntry fileEntryObj : fileEntryService1) {
-				System.out.println(fileEntryObj.getTitle());
-				System.out.println(fileEntryObj.getFileVersion());
+			List<DLFolder> dlFolders =
+				DLFolderLocalServiceUtil.getDLFolders(0, DLFolderLocalServiceUtil.getDLFoldersCount() - 1);
+			
+			
+			List<DLFileEntry> fileEntryService =
+				DLFileEntryLocalServiceUtil.getFileEntries(groupId, parentFolderId, -1, -1, null);
+			for (DLFileEntry fileEntryObj : fileEntryService) {
+				/*System.out.println(fileEntryObj.getTitle());
+				System.out.println(fileEntryObj.getFileVersion());*/
 				String expiryDateString = null;
 
 				long fileEntryTypeId = fileEntryObj.getFileEntryTypeId();
 
-				//check whether document contains any documentType or not.
-				//This implies there is expiry date for given document and hence document can expires.
+				// check whether document contains any documentType or not.
+				// This implies there is expiry date for given document and
+				// hence document can expires.
 				if (fileEntryTypeId != 0) {
-					DLFileEntryType dLFileEntryType = DLFileEntryTypeLocalServiceUtil.getDLFileEntryType(fileEntryTypeId);
+					DLFileEntryType dLFileEntryType =
+						DLFileEntryTypeLocalServiceUtil.getDLFileEntryType(fileEntryTypeId);
 
 					List<DDMStructure> structures = dLFileEntryType.getDDMStructures();
 					innerForLoop: for (DDMStructure struct : structures) {
-						DLFileEntryMetadata dlFileEntryMetadata = DLFileEntryMetadataLocalServiceUtil.getFileEntryMetadata(
+						DLFileEntryMetadata dlFileEntryMetadata =
+							DLFileEntryMetadataLocalServiceUtil.getFileEntryMetadata(
 								struct.getStructureId(), fileEntryObj.getFileVersion().getFileVersionId());
 						Fields fields = StorageEngineUtil.getFields(dlFileEntryMetadata.getDDMStorageId());
 						Iterator<Field> iField = fields.iterator();
 						while (iField.hasNext()) {
 							Field field = iField.next();
 
-							String expiryDateLabel = field.getDDMStructure().getFieldLabel(field.getName(), field.getDefaultLocale());
+							String expiryDateLabel =
+								field.getDDMStructure().getFieldLabel(field.getName(), field.getDefaultLocale());
 							if (expiryDateLabel.equals("Expiration Date")) {
 								expiryDateString = field.getValue().toString();
 								break innerForLoop;
@@ -107,52 +115,72 @@ public class Scheduler implements MessageListener {
 						}
 					}
 
-					if (null != expiryDateString) {
+					if (Validator.isNotNull(expiryDateString)) {
 						SimpleDateFormat sdf = new SimpleDateFormat("EE MMM dd HH:mm:ss z yyyy", Locale.ENGLISH);
 						SimpleDateFormat format = new SimpleDateFormat("MM/dd/yyyy HH:mm:ss");
-						//Date expiryDate = (Date) formatter.parse(expiryDateString);
+						// Date expiryDate = (Date)
+						// formatter.parse(expiryDateString);
 
-						//check if expiry date is equal or less than 15 days from current date, then send mail.
+						// check if expiry date is equal or less than 15 days
+						// from current date, then send mail.
 						Date currentDate = new Date(System.currentTimeMillis());
 						Date expiryDate = sdf.parse(expiryDateString);
 
 						long diff = currentDate.getTime() - expiryDate.getTime();
 						long diffDays = diff / (24 * 60 * 60 * 1000);
 						if (diffDays <= 15) {
-							String docOwnerEmail = UserLocalServiceUtil.getUser(fileEntryObj.getUserId()).getEmailAddress();
-							List<User> siteUsers = UserLocalServiceUtil.getGroupUsers(group.getGroupId());
+							String docOwnerEmail =
+								UserLocalServiceUtil.getUser(fileEntryObj.getUserId()).getEmailAddress();
+							List<User> siteUsers = UserLocalServiceUtil.getGroupUsers(groupId);
 
 							String siteAdminEmail = null;
 
-							//find the admin user
+							// find the admin user
 							usersLoop: for (User u : siteUsers) {
-								List<UserGroupRole> userGroupRoles = UserGroupRoleLocalServiceUtil.getUserGroupRoles(u.getUserId());
-								for (UserGroupRole ugRole : userGroupRoles) {
-									if (ugRole.getRole().getName().equals("Site Administrator")) {
-										siteAdminEmail = UserLocalServiceUtil.getUser(u.getUserId()).getEmailAddress();
-										break usersLoop;
-									}
+								/*
+								 * List<UserGroupRole> userGroupRoles =
+								 * UserGroupRoleLocalServiceUtil
+								 * .getUserGroupRoles(u.getUserId()); for
+								 * (UserGroupRole ugRole : userGroupRoles) { if
+								 * (ugRole.getRole().getName().equals(
+								 * "Site Administrator")) { siteAdminEmail =
+								 * UserLocalServiceUtil
+								 * .getUser(u.getUserId()).getEmailAddress();
+								 * break usersLoop; } }
+								 */
+
+								if (UserGroupRoleLocalServiceUtil.hasUserGroupRole(
+									u.getUserId(), groupId, "Site Administrator")) {
+									siteAdminEmail = UserLocalServiceUtil.getUser(u.getUserId()).getEmailAddress();
+									break usersLoop;
 								}
 							}
 
-							sendMailWithPlainText(docOwnerEmail, siteAdminEmail, companyId, fileEntryObj.getTitle(),
+							if (Validator.isNotNull(siteAdminEmail)) {
+								sendMailWithPlainText(
+									docOwnerEmail, siteAdminEmail, companyId, fileEntryObj.getTitle(),
 									dLFileEntryType.getName());
+							}
 						}
 					}
 				}
 			}
 
-		} catch (SystemException e) {
+		}
+		catch (SystemException e) {
 			e.printStackTrace();
-		} catch (PortalException e) {
+		}
+		catch (PortalException e) {
 			e.printStackTrace();
-		} catch (Exception e) {
+		}
+		catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
 
-	public void sendMailWithPlainText(String docOwnerEmail, String siteAdminEmail, Long companyId, String documentTitle, String documentType)
-			throws PortalException, SystemException {
+	public void sendMailWithPlainText(
+		String docOwnerEmail, String siteAdminEmail, Long companyId, String documentTitle, String documentType)
+		throws PortalException, SystemException {
 
 		InternetAddress fromAddress = null;
 		InternetAddress toAddress = null;
@@ -160,15 +188,22 @@ public class Scheduler implements MessageListener {
 		String doOwnerName = UserLocalServiceUtil.getUserByEmailAddress(companyId, docOwnerEmail).getFullName();
 		String siteAdminName = UserLocalServiceUtil.getUserByEmailAddress(companyId, siteAdminEmail).getFullName();
 
-		//Now change email template values.
+		// Now change email template values.
 		String body = ContentUtil.get("/content/email.tmpl", true);
-		body = StringUtil.replace(body, new String[] { "[$TO_NAME$]", "[$PORTLET_NAME$]", "[$DOCUMENT_TYPE$]", "[$DOCUMENT_TITLE$]",
-				"[$FROM_NAME$]", "[$FROM_ADDRESS$]" }, new String[] { doOwnerName, "Documents and Media", documentType, documentTitle,
-				siteAdminName, siteAdminEmail });
+		body =
+			StringUtil.replace(body, new String[] {
+				"[$TO_NAME$]", "[$PORTLET_NAME$]", "[$DOCUMENT_TYPE$]", "[$DOCUMENT_TITLE$]", "[$FROM_NAME$]",
+				"[$FROM_ADDRESS$]"
+			}, new String[] {
+				doOwnerName, "Documents and Media", documentType, documentTitle, siteAdminName, siteAdminEmail
+			});
 
 		String subject = "Exipration Notification of [$DOCUMENT_TYPE$]: [$DOCUMENT_TITLE$]";
-		subject = StringUtil.replace(subject, new String[] { "[$DOCUMENT_TYPE$]", "[$DOCUMENT_TITLE$]" }, new String[] { documentType,
-				documentTitle });
+		subject = StringUtil.replace(subject, new String[] {
+			"[$DOCUMENT_TYPE$]", "[$DOCUMENT_TITLE$]"
+		}, new String[] {
+			documentType, documentTitle
+		});
 
 		try {
 			fromAddress = new InternetAddress(docOwnerEmail);
@@ -181,7 +216,8 @@ public class Scheduler implements MessageListener {
 			mailMessage.setHTMLFormat(true);
 			MailServiceUtil.sendEmail(mailMessage);
 			System.out.println("Send mail with Plain Text");
-		} catch (AddressException e) {
+		}
+		catch (AddressException e) {
 			e.printStackTrace();
 		}
 	}
