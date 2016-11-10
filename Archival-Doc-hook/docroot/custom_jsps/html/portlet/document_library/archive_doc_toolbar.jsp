@@ -29,7 +29,7 @@ Group scopeGroup = themeDisplay.getScopeGroup();
 %>
 
 <aui:nav-bar>
-	<aui:nav collapsible="<%= false %>" cssClass="nav-display-style-buttons pull-right" id="displayStyleButtons">
+	<%-- <aui:nav collapsible="<%= false %>" cssClass="nav-display-style-buttons pull-right" id="displayStyleButtons">
 		<aui:nav-item>
 			<span class="pull-left display-style-buttons-container" id="<portlet:namespace />displayStyleButtonsContainer">
 				<c:if test='<%= !strutsAction.equals("/document_library/search") %>'>
@@ -37,45 +37,12 @@ Group scopeGroup = themeDisplay.getScopeGroup();
 				</c:if>
 			</span>
 		</aui:nav-item>
-	</aui:nav>
+	</aui:nav> --%>
 
 	<aui:nav id="toolbarContainer">
-		<aui:nav-item cssClass="hide" dropdown="<%= true %>" id="actionsButtonContainer" label="actions">
-			<c:if test="<%= !scopeGroup.isStaged() || scopeGroup.isStagingGroup() || !scopeGroup.isStagedPortlet(PortletKeys.DOCUMENT_LIBRARY) %>">
-
-				<%
-				String taglibURL = "javascript:Liferay.fire('" + renderResponse.getNamespace() + "editEntry', {action: '" + Constants.CANCEL_CHECKOUT + "'}); void(0);";
-				%>
-
-				<aui:nav-item href="<%= taglibURL %>" iconCssClass="icon-remove" label="cancel-checkout[document]" />
-
-				<%
-				taglibURL = "javascript:Liferay.fire('" + renderResponse.getNamespace() + "editEntry', {action: '" + Constants.CHECKIN + "'}); void(0);";
-				%>
-
-				<aui:nav-item href="<%= taglibURL %>" iconCssClass="icon-signin" label="checkin" />
-
-				<%
-				taglibURL = "javascript:Liferay.fire('" + renderResponse.getNamespace() + "editEntry', {action: '" + Constants.CHECKOUT + "'}); void(0);";
-				%>
-
-				<aui:nav-item href="<%= taglibURL %>" iconCssClass="icon-signout" label="checkout[document]" />
-
-				<%
-				taglibURL = "javascript:Liferay.fire('" + renderResponse.getNamespace() + "editEntry', {action: '" + Constants.MOVE + "'}); void(0);";
-				%>
-
-				<aui:nav-item href="<%= taglibURL %>" iconCssClass="icon-move" label="move" />
-			</c:if>
-
+		<aui:nav-item cssClass="hide" dropdown="<%= true %>" id="actionsButtonContainer" label="actions">			
 			<%
-			String taglibURL = "javascript:Liferay.fire('" + renderResponse.getNamespace() + "editEntry', {action: '" + Constants.MOVE_TO_TRASH + "'}); void(0);";
-			%>
-
-			<aui:nav-item href="<%= taglibURL %>" iconCssClass="icon-trash" id="moveToTrashAction" label="move-to-the-recycle-bin" />
-	
-			<%
-			taglibURL = "javascript:Liferay.fire('" + renderResponse.getNamespace() + "editEntry', {action: '" + Constants.RESTORE + "'}); void(0);";
+			String taglibURL = "javascript:Liferay.fire('" + renderResponse.getNamespace() + "restore_archive_doc'); void(0);";
 			%>
 
 			<aui:nav-item href="<%= taglibURL %>" iconCssClass="icon-move" label="restore-archival" />
@@ -86,35 +53,14 @@ Group scopeGroup = themeDisplay.getScopeGroup();
 
 			<aui:nav-item href="<%= taglibURL %>" iconCssClass="icon-remove" id="deleteAction" label="delete" />
 		</aui:nav-item>
+	</aui:nav>
 	
+	<aui:nav>
 		<aui:input type="checkbox" value="3m" href="#" class="interactive checked" label="3 months" name="3 months" onClick="refreshPage1();" />
 		<aui:input type="checkbox" value="6m" href="#" class="interactive" label="6 months" name="6 months" />
 		<aui:input type="checkbox" value="1y" href="#" class="interactive" label="1 year" name="1 year" />
-		
 	</aui:nav>
 
-	<c:if test="<%= showFoldersSearch %>">
-		<aui:nav-bar-search cssClass="pull-right">
-			<div class="form-search">
-				<liferay-portlet:resourceURL varImpl="searchURL">
-					<portlet:param name="struts_action" value="/document_library/search" />
-					<portlet:param name="repositoryId" value="<%= String.valueOf(repositoryId) %>" />
-					<portlet:param name="searchRepositoryId" value="<%= String.valueOf(folderId) %>" />
-					<portlet:param name="folderId" value="<%= String.valueOf(folderId) %>" />
-					<portlet:param name="searchFolderId" value="<%= String.valueOf(folderId) %>" />
-				</liferay-portlet:resourceURL>
-
-				<aui:form action="<%= searchURL.toString() %>" method="get" name="fm1" onSubmit="event.preventDefault();">
-					<liferay-portlet:renderURLParams varImpl="searchURL" />
-					<aui:input name="redirect" type="hidden" value="<%= currentURL %>" />
-					<aui:input name="breadcrumbsFolderId" type="hidden" value="<%= folderId %>" />
-					<aui:input name="searchFolderIds" type="hidden" value="<%= folderId %>" />
-					
-					<liferay-ui:input-search />
-				</aui:form>
-			</div>
-		</aui:nav-bar-search>
-	</c:if>
 </aui:nav-bar>
 
 <aui:script>

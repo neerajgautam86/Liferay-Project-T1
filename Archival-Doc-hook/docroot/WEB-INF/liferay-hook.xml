@@ -5,7 +5,12 @@
 	<language-properties>content/Language.properties</language-properties>
 	<custom-jsp-dir>/custom_jsps</custom-jsp-dir>
 	<struts-action>
-		<struts-action-path>/document_library/archive_doc</struts-action-path>
+		<struts-action-path>/document_library/archive_doc_view</struts-action-path>
 		<struts-action-impl>com.liferay.custom.document.hook.CustomArchiveFileEntryAction</struts-action-impl>
+	</struts-action>
+	
+	<struts-action>
+		<struts-action-path>/document_library/restore_archive_doc</struts-action-path>
+		<struts-action-impl>com.liferay.custom.document.hook.RestoreArchiveFileEntryAction</struts-action-impl>
 	</struts-action>
 </hook>

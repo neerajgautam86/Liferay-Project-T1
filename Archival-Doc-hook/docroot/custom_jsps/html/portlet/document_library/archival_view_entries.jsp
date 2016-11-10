@@ -29,11 +29,11 @@ long fileEntryTypeId = ParamUtil.getLong(request, "fileEntryTypeId", -1);
 
 String dlFileEntryTypeName = LanguageUtil.get(pageContext, "basic-document");
 
-int status = WorkflowConstants.STATUS_APPROVED;
+int status = WorkflowConstants.STATUS_EXPIRED;
 
-if (permissionChecker.isContentReviewer(user.getCompanyId(), scopeGroupId)) {
+/* if (permissionChecker.isContentReviewer(user.getCompanyId(), scopeGroupId)) {
 	status = WorkflowConstants.STATUS_ANY;
-}
+} */
 
 long categoryId = ParamUtil.getLong(request, "categoryId");
 String tagName = ParamUtil.getString(request, "tag");
@@ -136,6 +136,7 @@ if (fileEntryTypeId >= 0) {
 	SearchContext searchContext = SearchContextFactory.getInstance(request);
 
 	searchContext.setAttribute("paginationType", "none");
+	searchContext.setAttribute("status", status);
 	searchContext.setEnd(entryEnd);
 
 	if (orderByCol.equals("creationDate")) {
@@ -228,7 +229,7 @@ else {
 		if (navigation.equals("mine") && themeDisplay.isSignedIn()) {
 			groupFileEntriesUserId = user.getUserId();
 
-			status = WorkflowConstants.STATUS_ANY;
+			status = WorkflowConstants.STATUS_EXPIRED;
 		}
 
 		total = DLAppServiceUtil.getGroupFileEntriesCount(repositoryId, groupFileEntriesUserId, folderId, null, status);
