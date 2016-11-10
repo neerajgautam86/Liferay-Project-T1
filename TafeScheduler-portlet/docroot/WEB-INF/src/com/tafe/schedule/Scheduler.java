@@ -36,7 +36,9 @@ import com.liferay.portlet.dynamicdatamapping.storage.Field;
 import com.liferay.portlet.dynamicdatamapping.storage.Fields;
 import com.liferay.portlet.dynamicdatamapping.storage.StorageEngineUtil;
 import com.liferay.util.ContentUtil;
+import com.liferay.util.portlet.PortletProps;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Iterator;
@@ -57,7 +59,7 @@ public class Scheduler implements MessageListener {
 			Long companyId = PortalUtil.getDefaultCompanyId();
 
 			// code to resolve permission checker issue in scheduler
-			Role adminRole = RoleLocalServiceUtil.getRole(companyId, "Administrator");
+			Role adminRole = RoleLocalServiceUtil.getRole(companyId, PortletProps.get("role.name"));
 			List<User> adminUsers = UserLocalServiceUtil.getRoleUsers(adminRole.getRoleId());
 
 			PrincipalThreadLocal.setName(adminUsers.get(0).getUserId());
@@ -65,7 +67,7 @@ public class Scheduler implements MessageListener {
 			PermissionThreadLocal.setPermissionChecker(permissionChecker);
 
 			// TODO: Change this to TAFE site name.
-			Group group = GroupLocalServiceUtil.getGroup(companyId, "Guest");
+			Group group = GroupLocalServiceUtil.getGroup(companyId, PortletProps.get("site.name"));
 			Long groupId = group.getGroupId();
 
 			/*
@@ -78,91 +80,24 @@ public class Scheduler implements MessageListener {
 
 			List<DLFolder> dlFolders =
 				DLFolderLocalServiceUtil.getDLFolders(0, DLFolderLocalServiceUtil.getDLFoldersCount() - 1);
-			
-			
-			List<DLFileEntry> fileEntryService =
-				DLFileEntryLocalServiceUtil.getFileEntries(groupId, parentFolderId, -1, -1, null);
-			for (DLFileEntry fileEntryObj : fileEntryService) {
-				/*System.out.println(fileEntryObj.getTitle());
-				System.out.println(fileEntryObj.getFileVersion());*/
-				String expiryDateString = null;
 
-				long fileEntryTypeId = fileEntryObj.getFileEntryTypeId();
+			// List<DLFileEntry> dlFileEntries = null;
 
-				// check whether document contains any documentType or not.
-				// This implies there is expiry date for given document and
-				// hence document can expires.
-				if (fileEntryTypeId != 0) {
-					DLFileEntryType dLFileEntryType =
-						DLFileEntryTypeLocalServiceUtil.getDLFileEntryType(fileEntryTypeId);
-
-					List<DDMStructure> structures = dLFileEntryType.getDDMStructures();
-					innerForLoop: for (DDMStructure struct : structures) {
-						DLFileEntryMetadata dlFileEntryMetadata =
-							DLFileEntryMetadataLocalServiceUtil.getFileEntryMetadata(
-								struct.getStructureId(), fileEntryObj.getFileVersion().getFileVersionId());
-						Fields fields = StorageEngineUtil.getFields(dlFileEntryMetadata.getDDMStorageId());
-						Iterator<Field> iField = fields.iterator();
-						while (iField.hasNext()) {
-							Field field = iField.next();
-
-							String expiryDateLabel =
-								field.getDDMStructure().getFieldLabel(field.getName(), field.getDefaultLocale());
-							if (expiryDateLabel.equals("Expiration Date")) {
-								expiryDateString = field.getValue().toString();
-								break innerForLoop;
-							}
-						}
+			// Check all the documents under all the folders.
+			if (!dlFolders.isEmpty()) {
+				for (DLFolder folder : dlFolders) {
+					List<DLFileEntry> dlFileEntries =
+						DLFileEntryLocalServiceUtil.getFileEntries(groupId, folder.getFolderId(), -1, -1, null);
+					if (!dlFileEntries.isEmpty()) {
+						getDLFileEntries(companyId, groupId, dlFileEntries);
 					}
-
-					if (Validator.isNotNull(expiryDateString)) {
-						SimpleDateFormat sdf = new SimpleDateFormat("EE MMM dd HH:mm:ss z yyyy", Locale.ENGLISH);
-						SimpleDateFormat format = new SimpleDateFormat("MM/dd/yyyy HH:mm:ss");
-						// Date expiryDate = (Date)
-						// formatter.parse(expiryDateString);
-
-						// check if expiry date is equal or less than 15 days
-						// from current date, then send mail.
-						Date currentDate = new Date(System.currentTimeMillis());
-						Date expiryDate = sdf.parse(expiryDateString);
-
-						long diff = currentDate.getTime() - expiryDate.getTime();
-						long diffDays = diff / (24 * 60 * 60 * 1000);
-						if (diffDays <= 15) {
-							String docOwnerEmail =
-								UserLocalServiceUtil.getUser(fileEntryObj.getUserId()).getEmailAddress();
-							List<User> siteUsers = UserLocalServiceUtil.getGroupUsers(groupId);
-
-							String siteAdminEmail = null;
-
-							// find the admin user
-							usersLoop: for (User u : siteUsers) {
-								/*
-								 * List<UserGroupRole> userGroupRoles =
-								 * UserGroupRoleLocalServiceUtil
-								 * .getUserGroupRoles(u.getUserId()); for
-								 * (UserGroupRole ugRole : userGroupRoles) { if
-								 * (ugRole.getRole().getName().equals(
-								 * "Site Administrator")) { siteAdminEmail =
-								 * UserLocalServiceUtil
-								 * .getUser(u.getUserId()).getEmailAddress();
-								 * break usersLoop; } }
-								 */
-
-								if (UserGroupRoleLocalServiceUtil.hasUserGroupRole(
-									u.getUserId(), groupId, "Site Administrator")) {
-									siteAdminEmail = UserLocalServiceUtil.getUser(u.getUserId()).getEmailAddress();
-									break usersLoop;
-								}
-							}
-
-							if (Validator.isNotNull(siteAdminEmail)) {
-								sendMailWithPlainText(
-									docOwnerEmail, siteAdminEmail, companyId, fileEntryObj.getTitle(),
-									dLFileEntryType.getName());
-							}
-						}
-					}
+				}
+			}
+			else {
+				List<DLFileEntry> dlFileEntries =
+					DLFileEntryLocalServiceUtil.getFileEntries(groupId, parentFolderId, -1, -1, null);
+				if (!dlFileEntries.isEmpty()) {
+					getDLFileEntries(companyId, groupId, dlFileEntries);
 				}
 			}
 
@@ -173,9 +108,100 @@ public class Scheduler implements MessageListener {
 		catch (PortalException e) {
 			e.printStackTrace();
 		}
+		catch (ParseException e) {
+			e.printStackTrace();
+		}
 		catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	private void getDLFileEntries(Long companyId, Long groupId, List<DLFileEntry> dlFileEntries)
+		throws PortalException, SystemException, ParseException {
+
+		for (DLFileEntry fileEntryObj : dlFileEntries) {
+			String expiryDateString = null;
+
+			long fileEntryTypeId = fileEntryObj.getFileEntryTypeId();
+
+			// check whether document contains any documentType or not.
+			// This implies there is expiry date for given document and
+			// hence document can expires.
+			if (fileEntryTypeId != 0) {
+				DLFileEntryType dLFileEntryType = DLFileEntryTypeLocalServiceUtil.getDLFileEntryType(fileEntryTypeId);
+
+				List<DDMStructure> structures = dLFileEntryType.getDDMStructures();
+				innerForLoop: for (DDMStructure struct : structures) {
+					DLFileEntryMetadata dlFileEntryMetadata =
+						DLFileEntryMetadataLocalServiceUtil.getFileEntryMetadata(
+							struct.getStructureId(), fileEntryObj.getFileVersion().getFileVersionId());
+					Fields fields = StorageEngineUtil.getFields(dlFileEntryMetadata.getDDMStorageId());
+					Iterator<Field> iField = fields.iterator();
+					while (iField.hasNext()) {
+						Field field = iField.next();
+
+						String expiryDateLabel =
+							field.getDDMStructure().getFieldLabel(field.getName(), field.getDefaultLocale());
+						if (expiryDateLabel.equals(PortletProps.get("expiry.custom.field.name"))) {
+							expiryDateString = field.getValue().toString();
+							break innerForLoop;
+						}
+					}
+				}
+
+				if (Validator.isNotNull(expiryDateString)) {
+					SimpleDateFormat sdf = new SimpleDateFormat(PortletProps.get("format.date"), Locale.ENGLISH);
+					// SimpleDateFormat format = new SimpleDateFormat("MM/dd/yyyy HH:mm:ss");
+					// Date expiryDate = (Date)
+					// formatter.parse(expiryDateString);
+
+					// check if expiry date is equal or less than 15 days
+					// from current date, then send mail.
+					Date currentDate = new Date(System.currentTimeMillis());
+					Date expiryDate = sdf.parse(expiryDateString);
+
+					long diff = currentDate.getTime() - expiryDate.getTime();
+					long diffDays = diff / (24 * 60 * 60 * 1000);
+					if (diffDays > 0 && diffDays <= Integer.parseInt(PortletProps.get("expiry.no.of.days"))) {
+						String docOwnerEmail = UserLocalServiceUtil.getUser(fileEntryObj.getUserId()).getEmailAddress();
+						List<User> siteUsers = UserLocalServiceUtil.getGroupUsers(groupId);
+
+						String siteAdminEmail = null;
+
+						// find the admin user
+						usersLoop: for (User u : siteUsers) {
+							/*
+							 * List<UserGroupRole> userGroupRoles =
+							 * UserGroupRoleLocalServiceUtil
+							 * .getUserGroupRoles(u.getUserId()); for
+							 * (UserGroupRole ugRole : userGroupRoles) { if
+							 * (ugRole.getRole().getName().equals(
+							 * "Site Administrator")) { siteAdminEmail =
+							 * UserLocalServiceUtil
+							 * .getUser(u.getUserId()).getEmailAddress();
+							 * break usersLoop; } }
+							 */
+
+							if (UserGroupRoleLocalServiceUtil.hasUserGroupRole(
+								u.getUserId(), groupId, PortletProps.get("site.admin.role"))) {
+								siteAdminEmail = UserLocalServiceUtil.getUser(u.getUserId()).getEmailAddress();
+								break usersLoop;
+							}
+						}
+
+						if (Validator.isNotNull(siteAdminEmail)) {
+							sendMailWithPlainText(
+								docOwnerEmail, siteAdminEmail, companyId, fileEntryObj.getTitle(),
+								dLFileEntryType.getName());
+						}
+					}else{
+						
+						//update the status of the document to archive
+					}
+				}
+			}
+		}
+
 	}
 
 	public void sendMailWithPlainText(
