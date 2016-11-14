@@ -2,6 +2,7 @@
 <!DOCTYPE hook PUBLIC "-//Liferay//DTD Hook 6.2.0//EN" "http://www.liferay.com/dtd/liferay-hook_6_2_0.dtd">
 
 <hook>
+	<portal-properties>portal-hooked.properties</portal-properties>
 	<language-properties>content/Language.properties</language-properties>
 	<custom-jsp-dir>/custom_jsps</custom-jsp-dir>
 	<struts-action>
@@ -10,7 +11,7 @@
 	</struts-action>
 	
 	<struts-action>
-		<struts-action-path>/document_library/restore_archive_doc</struts-action-path>
-		<struts-action-impl>com.liferay.custom.document.hook.RestoreArchiveFileEntryAction</struts-action-impl>
+		<struts-action-path>/document_library/archive_doc_action</struts-action-path>
+		<struts-action-impl>com.liferay.custom.document.hook.ArchiveFileEntryAction</struts-action-impl>
 	</struts-action>
 </hook>

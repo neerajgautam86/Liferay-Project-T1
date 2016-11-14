@@ -3,6 +3,8 @@ package com.tafe.schedule;
 import com.liferay.mail.service.MailServiceUtil;
 import com.liferay.portal.kernel.exception.PortalException;
 import com.liferay.portal.kernel.exception.SystemException;
+import com.liferay.portal.kernel.log.Log;
+import com.liferay.portal.kernel.log.LogFactoryUtil;
 import com.liferay.portal.kernel.mail.MailMessage;
 import com.liferay.portal.kernel.messaging.Message;
 import com.liferay.portal.kernel.messaging.MessageListener;
@@ -12,6 +14,7 @@ import com.liferay.portal.kernel.util.Validator;
 import com.liferay.portal.kernel.workflow.WorkflowConstants;
 import com.liferay.portal.model.Group;
 import com.liferay.portal.model.Role;
+import com.liferay.portal.model.RoleConstants;
 import com.liferay.portal.model.User;
 import com.liferay.portal.security.auth.PrincipalThreadLocal;
 import com.liferay.portal.security.permission.PermissionChecker;
@@ -52,6 +55,8 @@ import javax.mail.internet.InternetAddress;
 
 public class Scheduler implements MessageListener {
 
+	private static Log LOGGER = LogFactoryUtil.getLog(Scheduler.class);
+
 	@Override
 	public void receive(Message arg0) throws MessageListenerException {
 
@@ -67,46 +72,60 @@ public class Scheduler implements MessageListener {
 			PermissionChecker permissionChecker = PermissionCheckerFactoryUtil.create(adminUsers.get(0), true);
 			PermissionThreadLocal.setPermissionChecker(permissionChecker);
 
-			// TODO: Change this to TAFE site name.
-			Group group = GroupLocalServiceUtil.getGroup(companyId, PortletProps.get("site.name"));
-			Long groupId = group.getGroupId();
+			// get all live groups and for each site check for document and media library.
+			List<Group> liveGroups = GroupLocalServiceUtil.getCompanyGroups(companyId, 0,
+					GroupLocalServiceUtil.getCompanyGroupsCount(companyId));
+			for (Group group : liveGroups) {
+				Long groupId = group.getGroupId();
 
-			List<DLFolder> dlFolders = DLFolderLocalServiceUtil.getFolders(group.getGroupId(), parentFolderId);
+				List<DLFolder> dlFolders = DLFolderLocalServiceUtil.getFolders(group.getGroupId(), parentFolderId);
 
-			// Check all the documents under all the folders.
-			if (!dlFolders.isEmpty()) {
-				for (DLFolder folder : dlFolders) {
-					List<DLFileEntry> dlFileEntries = DLFileEntryLocalServiceUtil.getFileEntries(groupId, folder.getFolderId(), -1, -1,
-							null);
-					if (!dlFileEntries.isEmpty()) {
-						getDLFileEntries(companyId, groupId, dlFileEntries);
+				// Check all the documents under all the folders.
+				if (!dlFolders.isEmpty()) {
+					for (DLFolder folder : dlFolders) {
+						List<DLFileEntry> dlFileEntries = DLFileEntryLocalServiceUtil.getFileEntries(groupId, folder.getFolderId(), -1, -1,
+								null);
+						if (!dlFileEntries.isEmpty()) {
+							getDLFileEntries(companyId, groupId, dlFileEntries);
+						}
 					}
+				}
+
+				//Now scan all documents under by default folder of DM portlet i.e. Home
+				List<DLFileEntry> dlFileEntries = DLFileEntryLocalServiceUtil.getFileEntries(groupId, parentFolderId, -1, -1, null);
+				if (!dlFileEntries.isEmpty()) {
+					getDLFileEntries(companyId, groupId, dlFileEntries);
 				}
 			}
 
-			//Now scan all documents under by default folder of DM portlet i.e. Home
-			List<DLFileEntry> dlFileEntries = DLFileEntryLocalServiceUtil.getFileEntries(groupId, parentFolderId, -1, -1, null);
-			if (!dlFileEntries.isEmpty()) {
-				getDLFileEntries(companyId, groupId, dlFileEntries);
-			}
-
 		} catch (SystemException e) {
-			e.printStackTrace();
+			LOGGER.error("System Exception is thrown while running scheduler.");
 		} catch (PortalException e) {
-			e.printStackTrace();
+			LOGGER.error("Portal Exception is thrown while running scheduler.");
 		} catch (ParseException e) {
-			e.printStackTrace();
+			LOGGER.error("Parsing Exception is thrown while running scheduler.");
 		} catch (Exception e) {
-			e.printStackTrace();
+			LOGGER.error("Exception is thrown while running scheduler.");
 		}
 	}
 
+	/**
+	 * Method to iterate through all documents in a given folder. Check the
+	 * calling method for the same.
+	 * 
+	 * @param companyId
+	 * @param groupId
+	 * @param dlFileEntries
+	 * @throws PortalException
+	 * @throws SystemException
+	 * @throws ParseException
+	 */
 	private void getDLFileEntries(Long companyId, Long groupId, List<DLFileEntry> dlFileEntries) throws PortalException, SystemException,
 			ParseException {
 
 		for (DLFileEntry fileEntryObj : dlFileEntries) {
 			String expiryDateString = null;
-			System.out.println("Doc file Name=" + fileEntryObj.getTitle());
+			LOGGER.info("Doc file Name=" + fileEntryObj.getTitle());
 			long fileEntryTypeId = fileEntryObj.getFileEntryTypeId();
 
 			// check whether document contains any documentType or not.
@@ -141,35 +160,45 @@ public class Scheduler implements MessageListener {
 
 					long diff = expiryDate.getTime() - currentDate.getTime();
 					long diffDays = diff / (24 * 60 * 60 * 1000);
-					System.out.println("Diff in no of days=" + diffDays);
+					LOGGER.info("Diff in no of days=" + diffDays);
 
 					//update the status of the document to archive
 					if (expiryDate.before(currentDate) && fileEntryObj.getFileVersion().getStatus() != WorkflowConstants.STATUS_EXPIRED) {
 
-						DLFileVersion updateFileVersion = fileEntryObj.getFileVersion();
-						updateFileVersion.setStatus(WorkflowConstants.STATUS_EXPIRED);
-						DLFileVersionLocalServiceUtil.updateDLFileVersion(updateFileVersion);
-						System.out.println(fileEntryObj.getFileVersion().getStatus());
+						//all file versions 
+						List<DLFileVersion> dlFileVersions = fileEntryObj.getFileVersions(-1);
+
+						//latest fileVersion
+						String latestDLFileVerion = fileEntryObj.getVersion();
+
+						for (DLFileVersion updateFileVersion : dlFileVersions) {
+							if (updateFileVersion.getVersion().equals(latestDLFileVerion)) {
+								updateFileVersion.setStatus(WorkflowConstants.STATUS_EXPIRED);
+								DLFileVersionLocalServiceUtil.updateDLFileVersion(updateFileVersion);
+								LOGGER.info(fileEntryObj.getFileVersion().getStatus());
+							}
+						}
 					}
 
+					//send email only on 15th day irrespective of scheduler being running.
 					if (expiryDate.after(currentDate) && diffDays > 0
-							&& diffDays <= Integer.parseInt(PortletProps.get("expiry.no.of.days"))) {
+							&& diffDays == Integer.parseInt(PortletProps.get("expiry.no.of.days"))) {
 
 						String docOwnerEmail = UserLocalServiceUtil.getUser(fileEntryObj.getUserId()).getEmailAddress();
 						List<User> siteUsers = UserLocalServiceUtil.getGroupUsers(groupId);
 
 						String siteAdminEmail = null;
 
-						// find the admin user
+						// find the site admin user
 						usersLoop: for (User u : siteUsers) {
-							if (UserGroupRoleLocalServiceUtil.hasUserGroupRole(u.getUserId(), groupId, PortletProps.get("site.admin.role"))) {
+							if (UserGroupRoleLocalServiceUtil.hasUserGroupRole(u.getUserId(), groupId, RoleConstants.SITE_ADMINISTRATOR)) {
 								siteAdminEmail = UserLocalServiceUtil.getUser(u.getUserId()).getEmailAddress();
 								break usersLoop;
 							}
 						}
 
 						if (Validator.isNotNull(siteAdminEmail)) {
-							System.out.println("Mail sent for doc with title=" + fileEntryObj.getTitle());
+							LOGGER.info("Mail sent for doc with title=" + fileEntryObj.getTitle());
 							sendMailWithPlainText(docOwnerEmail, siteAdminEmail, companyId, fileEntryObj.getTitle(),
 									dLFileEntryType.getName());
 						}
@@ -186,13 +215,13 @@ public class Scheduler implements MessageListener {
 		InternetAddress fromAddress = null;
 		InternetAddress toAddress = null;
 
-		String doOwnerName = UserLocalServiceUtil.getUserByEmailAddress(companyId, docOwnerEmail).getFullName();
+		String docOwnerName = UserLocalServiceUtil.getUserByEmailAddress(companyId, docOwnerEmail).getFullName();
 		String siteAdminName = UserLocalServiceUtil.getUserByEmailAddress(companyId, siteAdminEmail).getFullName();
 
 		// Now change email template values.
 		String body = ContentUtil.get("/content/email.tmpl", true);
 		body = StringUtil.replace(body, new String[] { "[$TO_NAME$]", "[$PORTLET_NAME$]", "[$DOCUMENT_TYPE$]", "[$DOCUMENT_TITLE$]",
-				"[$FROM_NAME$]", "[$FROM_ADDRESS$]" }, new String[] { doOwnerName, "Documents and Media", documentType, documentTitle,
+				"[$FROM_NAME$]", "[$FROM_ADDRESS$]" }, new String[] { docOwnerName, "Documents and Media", documentType, documentTitle,
 				siteAdminName, siteAdminEmail });
 
 		String subject = "Exipration Notification of [$DOCUMENT_TYPE$]: [$DOCUMENT_TITLE$]";
@@ -200,11 +229,12 @@ public class Scheduler implements MessageListener {
 				documentTitle });
 
 		try {
-			fromAddress = new InternetAddress(docOwnerEmail);
-			toAddress = new InternetAddress(siteAdminEmail);
+			fromAddress = new InternetAddress(siteAdminEmail);
+			toAddress = new InternetAddress(docOwnerEmail);
 			MailMessage mailMessage = new MailMessage();
 			mailMessage.setTo(toAddress);
 			mailMessage.setFrom(fromAddress);
+			mailMessage.setCC(fromAddress);
 			mailMessage.setSubject(subject);
 			mailMessage.setBody(body);
 			mailMessage.setHTMLFormat(true);

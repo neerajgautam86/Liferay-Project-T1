@@ -28,30 +28,34 @@ long repositoryId = GetterUtil.getLong((String)request.getAttribute("view.jsp-re
 Group scopeGroup = themeDisplay.getScopeGroup();
 %>
 
-<aui:nav-bar>
-	<%-- <aui:nav collapsible="<%= false %>" cssClass="nav-display-style-buttons pull-right" id="displayStyleButtons">
-		<aui:nav-item>
-			<span class="pull-left display-style-buttons-container" id="<portlet:namespace />displayStyleButtonsContainer">
-				<c:if test='<%= !strutsAction.equals("/document_library/search") %>'>
-					<liferay-util:include page="/html/portlet/document_library/display_style_buttons.jsp" />
-				</c:if>
-			</span>
-		</aui:nav-item>
-	</aui:nav> --%>
+<portlet:renderURL var="restoreURL">
+	<portlet:param name="struts_action" value="/document_library/archive_doc_action" />
+	<portlet:param name="<%= Constants.CMD %>" value="<%= Constants.RESTORE %>" />
+	<portlet:param name="redirect" value="<%= currentURL %>" />
+</portlet:renderURL>
 
+<portlet:renderURL var="deleteURL">
+	<portlet:param name="struts_action" value="/document_library/archive_doc_action" />
+	<portlet:param name="<%= Constants.CMD %>" value="<%= Constants.DELETE %>" />
+	<portlet:param name="redirect" value="<%= currentURL %>" />
+</portlet:renderURL>
+
+<aui:nav-bar>
+	
 	<aui:nav id="toolbarContainer">
 		<aui:nav-item cssClass="hide" dropdown="<%= true %>" id="actionsButtonContainer" label="actions">			
-			<%
-			String taglibURL = "javascript:Liferay.fire('" + renderResponse.getNamespace() + "restore_archive_doc'); void(0);";
-			%>
+			<%-- <%
+			String taglibURL = "javascript:Liferay.fire('" + renderResponse.getNamespace() + "archive_doc_action', {action: '"
+					+ Constants.RESTORE + "'}); void(0);";
+			%> --%>
 
-			<aui:nav-item href="<%= taglibURL %>" iconCssClass="icon-move" label="restore-archival" />
+			<aui:nav-item href="<%= restoreURL %>" iconCssClass="icon-move" label="restore-archival" />
 			
-			<%
+			<%-- <%
 			taglibURL = "javascript:" + renderResponse.getNamespace() + "deleteEntries();";
-			%>
+			%> --%>
 
-			<aui:nav-item href="<%= taglibURL %>" iconCssClass="icon-remove" id="deleteAction" label="delete" />
+			<aui:nav-item href="<%= deleteURL %>" iconCssClass="icon-remove" id="deleteAction" label="delete" />
 		</aui:nav-item>
 	</aui:nav>
 	
@@ -62,19 +66,6 @@ Group scopeGroup = themeDisplay.getScopeGroup();
 	</aui:nav>
 
 </aui:nav-bar>
-
-<aui:script>
-	function <portlet:namespace />deleteEntries() {
-		if (confirm('<%= UnicodeLanguageUtil.get(pageContext, "are-you-sure-you-want-to-delete-the-selected-entries") %>')) {
-			Liferay.fire(
-				'<%= renderResponse.getNamespace() %>editEntry',
-				{
-					action: '<%= Constants.DELETE %>'
-				}
-			);
-		}
-	}
-</aui:script>
 
 <script>
 	function refreshPage1(){
