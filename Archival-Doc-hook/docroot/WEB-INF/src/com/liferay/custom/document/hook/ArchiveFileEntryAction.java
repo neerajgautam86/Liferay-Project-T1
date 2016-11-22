@@ -43,19 +43,7 @@ public class ArchiveFileEntryAction extends BaseStrutsPortletAction {
 	public String render(StrutsPortletAction originalStrutsPortletAction, PortletConfig portletConfig, RenderRequest renderRequest,
 			RenderResponse renderResponse) throws Exception {
 
-		return originalStrutsPortletAction.render(null, portletConfig, renderRequest, renderResponse);
-
-		//return "/portlet/document_library/archive_doc.jsp";
-	}
-
-	@Override
-	public void serveResource(StrutsPortletAction originalStrutsPortletAction, PortletConfig portletConfig,
-			ResourceRequest resourceRequest, ResourceResponse resourceResponse) throws Exception {
-
-		LOGGER.info("Archive Custom Action class is called for serveResource.");
-
-		originalStrutsPortletAction.serveResource(originalStrutsPortletAction, portletConfig, resourceRequest, resourceResponse);
-
+		return originalStrutsPortletAction.render(null, portletConfig, renderRequest, renderResponse);		
 	}
 
 	@Override
@@ -66,11 +54,11 @@ public class ArchiveFileEntryAction extends BaseStrutsPortletAction {
 
 		long[] fileEntryIds = StringUtil.split(ParamUtil.getString(actionRequest, "fileEntryIds"), 0L);
 		String cmd = ParamUtil.getString(actionRequest, "cmd");
-		if (cmd.equals("restore")) {
+		if (cmd.equals("restore_archive")) {
 
 			for (int i = 0; i < fileEntryIds.length; i++) {
-				long fileEntryTypeId = fileEntryIds[i];
-				DLFileEntry dlFileEntry = DLFileEntryLocalServiceUtil.getFileEntry(fileEntryTypeId);
+				long fileEntryId = fileEntryIds[i];
+				DLFileEntry dlFileEntry = DLFileEntryLocalServiceUtil.getFileEntry(fileEntryId);
 
 				//all file versions 
 				List<DLFileVersion> dlFileVersions = dlFileEntry.getFileVersions(-1);
@@ -80,6 +68,7 @@ public class ArchiveFileEntryAction extends BaseStrutsPortletAction {
 
 				for (DLFileVersion updateFileVersion : dlFileVersions) {
 					if (updateFileVersion.getVersion().equals(latestDLFileVerion)) {
+						LOGGER.info(dlFileEntry.getFileVersion().getStatus());
 						updateFileVersion.setStatus(WorkflowConstants.STATUS_APPROVED);
 						DLFileVersionLocalServiceUtil.updateDLFileVersion(updateFileVersion);
 						LOGGER.info(dlFileEntry.getFileVersion().getStatus());
@@ -87,7 +76,7 @@ public class ArchiveFileEntryAction extends BaseStrutsPortletAction {
 				}
 
 				//update expiry date field.
-				DLFileEntryType dLFileEntryType = DLFileEntryTypeLocalServiceUtil.getDLFileEntryType(fileEntryTypeId);
+				DLFileEntryType dLFileEntryType = DLFileEntryTypeLocalServiceUtil.getDLFileEntryType(dlFileEntry.getFileEntryTypeId());
 
 				List<DDMStructure> structures = dLFileEntryType.getDDMStructures();
 				innerForLoop: for (DDMStructure struct : structures) {
@@ -101,21 +90,21 @@ public class ArchiveFileEntryAction extends BaseStrutsPortletAction {
 						String expiryDateLabel = field.getDDMStructure().getFieldLabel(field.getName(), field.getDefaultLocale());
 						if (expiryDateLabel.equals(PropsUtil.get("expiry.custom.field.name"))) {
 							LOGGER.info(field.getValue().toString());
-							field.setValue(null);
-							LOGGER.info("field value after setting null is " + field.getValue().toString());
+							field.setValue("");
 							break innerForLoop;
 						}
 					}
 				}
 			}
 
-		} else if (cmd.equals("delete")) {
+		} 
+		/*else if (cmd.equals("delete")) {
 
 			for (int i = 0; i < fileEntryIds.length; i++) {
 				long deleteFileEntryId = fileEntryIds[i];
 				DLAppServiceUtil.deleteFileEntry(deleteFileEntryId);
 			}
-		}
+		}*/
 
 		originalStrutsPortletAction.processAction(originalStrutsPortletAction, portletConfig, actionRequest, actionResponse);
 	}

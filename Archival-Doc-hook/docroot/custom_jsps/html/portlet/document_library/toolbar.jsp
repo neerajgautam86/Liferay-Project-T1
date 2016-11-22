@@ -17,6 +17,11 @@
 <%@ include file="/html/portlet/document_library/init.jsp"%>
 
 <%
+String check = "test";
+	String navigation = ParamUtil.getString(request, "navigation", "home");
+		 
+	long fileEntryTypeId = ParamUtil.getLong(request, "fileEntryTypeId", DLFileEntryTypeConstants.FILE_ENTRY_TYPE_ID_ALL);
+		 
 	String strutsAction = ParamUtil.getString(request, "struts_action");
 
 	Folder folder = (Folder) request.getAttribute("view.jsp-folder");
@@ -26,6 +31,11 @@
 	long repositoryId = GetterUtil.getLong((String) request.getAttribute("view.jsp-repositoryId"));
 
 	Group scopeGroup = themeDisplay.getScopeGroup();
+	
+	boolean viewArchivalEntries = ParamUtil.getBoolean(request, "archiveDocCheck");
+	System.out.println(viewArchivalEntries);
+	System.out.println("url value = "+ PortalUtil.getOriginalServletRequest(request).getParameter("viewArchivalEntries"));
+	
 %>
 
 <aui:nav-bar>
@@ -80,6 +90,14 @@
 			%>
 
 			<aui:nav-item href="<%=taglibURL%>" iconCssClass="icon-trash" id="moveToTrashAction" label="move-to-the-recycle-bin" />
+			
+			<c:if test="<%= viewArchivalEntries %>">
+				<%
+				 taglibURL = "javascript:Liferay.fire('" + renderResponse.getNamespace() + "editEntry', {action: 'restore_archive'}); void(0);";
+				%>
+			
+				<aui:nav-item href="<%= taglibURL %>" iconCssClass="icon-move" label="restore-archival" />
+			</c:if>
 
 			<%
 				taglibURL = "javascript:" + renderResponse.getNamespace() + "deleteEntries();";
@@ -93,7 +111,7 @@
 		<liferay-util:include page="/html/portlet/document_library/sort_button.jsp" />
 
 		<c:if test="<%=!user.isDefaultUser()%>">
-			<aui:nav-item dropdown="<%=true%>" label="manage">
+			<aui:nav-item dropdown="<%=true%>" id="manageButtonContainer" label="manage">
 
 				<%
 					String taglibURL = "javascript:" + renderResponse.getNamespace() + "openFileEntryTypeView()";
@@ -107,9 +125,10 @@
 
 				<aui:nav-item href="<%=taglibURL%>" iconCssClass="icon-file-text" label="metadata-sets" />
 
+				
 				<c:if test="<%=permissionChecker.isGroupAdmin(scopeGroupId)%>">
 					<%
-						taglibURL = "javascript:" + renderResponse.getNamespace() + "openDocArchivalView()";
+						taglibURL = "javascript:" + renderResponse.getNamespace() + "openDocArchivalView('" + folderId + "')";
 					%>
 
 					<aui:nav-item href="<%=taglibURL%>" iconCssClass="icon-file" label="document-archival" />
@@ -144,6 +163,31 @@
 </aui:nav-bar>
 
 <aui:script>
+	Liferay.provide(
+		window,
+		'<portlet:namespace />openDocArchivalView',
+		function(folderId) {
+			
+			
+			Liferay.fire(
+				'<portlet:namespace />dataRequest',
+				{
+					requestParams: {
+						'<portlet:namespace />folderId': folderId,
+						'<portlet:namespace />navigation': '<%= HtmlUtil.escape(navigation) %>',
+						'<portlet:namespace />struts_action': '/document_library/view',
+						'<portlet:namespace />fileEntryTypeId': <%= fileEntryTypeId %>,
+						'<portlet:namespace />viewEntries': <%= Boolean.FALSE.toString() %>,
+						'<portlet:namespace />viewEntriesPage': <%= Boolean.FALSE.toString() %>,
+						'<portlet:namespace />viewFolders': <%= Boolean.FALSE.toString() %>,
+						'<portlet:namespace />viewArchivalEntries': <%= Boolean.TRUE.toString() %>
+					}
+				}
+			);
+			
+		},
+		['aui-base']
+	);
 	function <portlet:namespace />deleteEntries() {
 		if (confirm('<%=UnicodeLanguageUtil.get(pageContext, "are-you-sure-you-want-to-delete-the-selected-entries")%>')) {
 			Liferay.fire(
@@ -182,13 +226,5 @@
 		);
 	}
 	
-	function <portlet:namespace />openDocArchivalView() {
-		Liferay.Util.openWindow(
-			{
-				id: '<portlet:namespace />openDocArchivalView',
-				title: '<%=UnicodeLanguageUtil.get(pageContext, "document-archival")%>',
-				uri: '<liferay-portlet:renderURL windowState="<%=LiferayWindowState.POP_UP.toString()%>"><portlet:param name="struts_action" value="/document_library/archive_doc_view" /><portlet:param name="redirect" value="<%=currentURL%>" /></liferay-portlet:renderURL>'
-			}
-		);
-	}
+	
 </aui:script>

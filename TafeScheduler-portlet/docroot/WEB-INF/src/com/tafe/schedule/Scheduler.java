@@ -16,6 +16,7 @@ import com.liferay.portal.model.Group;
 import com.liferay.portal.model.Role;
 import com.liferay.portal.model.RoleConstants;
 import com.liferay.portal.model.User;
+import com.liferay.portal.model.UserGroupRole;
 import com.liferay.portal.security.auth.PrincipalThreadLocal;
 import com.liferay.portal.security.permission.PermissionChecker;
 import com.liferay.portal.security.permission.PermissionCheckerFactoryUtil;
@@ -160,7 +161,6 @@ public class Scheduler implements MessageListener {
 
 					long diff = expiryDate.getTime() - currentDate.getTime();
 					long diffDays = diff / (24 * 60 * 60 * 1000);
-					LOGGER.info("Diff in no of days=" + diffDays);
 
 					//update the status of the document to archive
 					if (expiryDate.before(currentDate) && fileEntryObj.getFileVersion().getStatus() != WorkflowConstants.STATUS_EXPIRED) {
@@ -191,9 +191,11 @@ public class Scheduler implements MessageListener {
 
 						// find the site admin user
 						usersLoop: for (User u : siteUsers) {
-							if (UserGroupRoleLocalServiceUtil.hasUserGroupRole(u.getUserId(), groupId, RoleConstants.SITE_ADMINISTRATOR)) {
-								siteAdminEmail = UserLocalServiceUtil.getUser(u.getUserId()).getEmailAddress();
-								break usersLoop;
+							for (UserGroupRole groupRole : UserGroupRoleLocalServiceUtil.getUserGroupRoles(u.getUserId())) {
+								if (groupRole.getRole().getName().equals(RoleConstants.SITE_ADMINISTRATOR)) {
+									siteAdminEmail = UserLocalServiceUtil.getUser(u.getUserId()).getEmailAddress();
+									break usersLoop;
+								}
 							}
 						}
 
@@ -239,7 +241,7 @@ public class Scheduler implements MessageListener {
 			mailMessage.setBody(body);
 			mailMessage.setHTMLFormat(true);
 			MailServiceUtil.sendEmail(mailMessage);
-			System.out.println("Send mail with Plain Text");
+			LOGGER.info("Send mail with Plain Text");
 		} catch (AddressException e) {
 			e.printStackTrace();
 		}

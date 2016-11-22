@@ -10,7 +10,8 @@
 			<scheduler-event-listener-class>com.tafe.schedule.Scheduler</scheduler-event-listener-class>
 			<trigger>
 				<cron>
-					<cron-trigger-value>0 0/1 * 1/1 * ? *</cron-trigger-value>					
+					<cron-trigger-value>0 0/1 * 1/1 * ? *</cron-trigger-value>
+					<!-- <cron-trigger-value>0 0 2 1/1 * ? *</cron-trigger-value> -->				
 				</cron>
 			</trigger>
 		</scheduler-entry>

@@ -1,0 +1,10 @@
+<portlet:actionURL var="restoreArchivalURL">
+	<portlet:param name="struts_action" value="/document_library/edit_file_entry" />
+	<portlet:param name="<%= Constants.CMD %>" value="restore_archive" />
+	<portlet:param name="redirect" value="<%= currentURL %>" />
+	<portlet:param name="fileEntryId" value="<%= String.valueOf(fileEntry.getFileEntryId()) %>" />
+</portlet:actionURL>
+
+<liferay-ui:icon
+		image="submit"
+		message="restore-archival"	url="<%= restoreArchivalURL.toString() %>" />

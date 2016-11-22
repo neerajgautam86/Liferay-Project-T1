@@ -6,12 +6,16 @@
 	<language-properties>content/Language.properties</language-properties>
 	<custom-jsp-dir>/custom_jsps</custom-jsp-dir>
 	<struts-action>
-		<struts-action-path>/document_library/archive_doc_view</struts-action-path>
+		<struts-action-path>/document_library/edit_file_entry</struts-action-path>
 		<struts-action-impl>com.liferay.custom.document.hook.CustomArchiveFileEntryAction</struts-action-impl>
 	</struts-action>
-	
 	<struts-action>
-		<struts-action-path>/document_library/archive_doc_action</struts-action-path>
+		<struts-action-path>/document_library/edit_entry</struts-action-path>
 		<struts-action-impl>com.liferay.custom.document.hook.ArchiveFileEntryAction</struts-action-impl>
 	</struts-action>
+	<!-- <struts-action>
+		<struts-action-path>/document_library/view</struts-action-path>
+		<struts-action-impl>com.liferay.custom.document.hook.ArchiveViewAction</struts-action-impl>
+	</struts-action> -->
+	
 </hook>
